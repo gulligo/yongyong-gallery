@@ -75,30 +75,18 @@ input{width:100%;font:inherit;padding:9px;border:1px solid var(--bd);border-radi
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/exifr@7.1.3/dist/lite.umd.js"></script>
 <script>
-const API='https://여기에_Worker_주소';
-let PW=localStorage.getItem('yy_pw')||'',data={groups:[],steps:{},tracks:[],ts:0};
+let data={groups:[],steps:{},tracks:[],ts:0};
 let galG=null,galList=[],selP=null,gi=[],gx=0,sx0=0,gTok=0,pushT,map,mk=[],pl=[];
 const $=s=>document.querySelector(s),uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2);
 const esc=s=>(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const F=k=>API+'/f/'+k+'?t='+encodeURIComponent(PW);
+const F=k=>'./'+k;
 
-/* ===== 서버 통신 ===== */
-function ask(){const p=prompt('비밀번호를 입력하세요');if(p){PW=p;localStorage.setItem('yy_pw',p)}return !!p}
-async function req(path,opt={}){opt.headers=Object.assign({},opt.headers||{},{'x-pw':PW});
-const r=await fetch(API+path,opt);
-if(r.status===401){alert('비밀번호가 맞지 않습니다.');PW='';localStorage.removeItem('yy_pw');if(ask())return req(path,opt)}
-return r}
-async function put(k,b,t){const r=await req('/f/'+k,{method:'PUT',headers:{'content-type':t},body:b});if(!r.ok)throw new Error('업로드 실패 '+r.status)}
-async function del(keys){if(keys.length)await req('/api/del',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(keys)})}
-function save(){data.ts=Date.now();localStorage.setItem('yy_data',JSON.stringify(data));clearTimeout(pushT);pushT=setTimeout(push,1200)}
-async function push(){try{await req('/api/data',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(data)})}catch(e){}}
+/* ===== 로컬 데이터 로드 및 초기화 ===== */
+function save(){data.ts=Date.now();localStorage.setItem('yy_data',JSON.stringify(data));}
 async function init(){
 try{const c=JSON.parse(localStorage.getItem('yy_data')||'null');if(c)data=c}catch(e){}
-if(!PW)ask();
 render();
-try{const r=await req('/api/data');if(r.ok){const d=await r.json();
-if(d.groups&&(d.ts||0)>(data.ts||0)){data=d;localStorage.setItem('yy_data',JSON.stringify(data));render()}
-else if((data.ts||0)>(d.ts||0))push()}}catch(e){}}
+}
 
 /* ===== 대그룹 / 사진 목록 ===== */
 function render(){
@@ -110,13 +98,13 @@ function addGrp(){const n=prompt('그룹 이름');if(!n||!n.trim())return;const 
 function renGrp(){const g=data.groups.find(x=>x.id===galG);if(!g)return;const n=prompt('새 이름',g.name);if(n&&n.trim()){g.name=n.trim();save();render()}}
 async function delGrp(){const g=data.groups.find(x=>x.id===galG);if(!g)return;
 if(!confirm('「'+g.name+'」와 안의 사진 '+(g.photos||[]).length+'장이 모두 삭제됩니다. 계속할까요?'))return;
-await del((g.photos||[]).flatMap(i=>[i.p,i.t]));data.groups=data.groups.filter(x=>x.id!==g.id);save();render()}
+data.groups=data.groups.filter(x=>x.id!==g.id);save();render()}
 function togM(){const g=data.groups.find(x=>x.id===galG);if(!g)return;g.manual=!g.manual;selP=null;save();renderBody()}
 function renderBody(){
 const g=data.groups.find(x=>x.id===galG);
 if(!g){$('#gtt').textContent='';$('#gmode').textContent='';$('#gbody').innerHTML='<div class="hint">왼쪽 아래 ＋ 그룹을 눌러 시작하세요</div>';return}
 g.photos=g.photos||[];$('#gtt').textContent=g.name;$('#gmode').textContent=g.manual?'🖐 직접':'📅 날짜';
-const cell=(i,fn,st)=>`<div onclick="${fn}('${i.id}')"${st||''}><img src="${F(i.t)}" loading="lazy">${i.k==='v'?'<b>▶</b>':''}</div>`;
+const cell=(i,fn,st)=>`<div onclick="${fn}('${i.id}')"${st||''}><img src="${i.t}" loading="lazy">${i.k==='v'?'<b>▶</b>':''}</div>`;
 if(g.manual){galList=[...g.photos];
 $('#gbody').innerHTML=`<div class="hint">${selP?'옮길 자리의 사진을 누르세요 (같은 사진을 다시 누르면 취소)':'옮길 사진을 먼저 누르세요 · 크게 보기는 📅 날짜 모드'}</div><div class="pg">`+galList.map(i=>cell(i,'pickP',i.id===selP?' style="outline:4px solid var(--pri);outline-offset:-4px;opacity:.6"':'')).join('')+'</div>';return}
 galList=[...g.photos].sort((a,b)=>(b.at||0)-(a.at||0));const days={};
@@ -142,13 +130,12 @@ const rec=new MediaRecorder(out,{mimeType:mt,videoBitsPerSecond:2e6}),ch=[];rec.
 const done=new Promise(r=>rec.onstop=r);rec.start(1000);
 (function d(){if(v.ended)return;x.drawImage(v,0,0,c.width,c.height);requestAnimationFrame(d)})();
 await once(v,'ended');rec.stop();await done;const o=new Blob(ch,{type:mt.split(';')[0]});return o.size&&o.size<f.size?o:f}catch(e){return f}}
-async function one(f,gid){const v=f.type.startsWith('video'),id=uid(),d='g/'+gid+'/';let m,t,lat,lng,ext='jpg',at=f.lastModified;
-if(v){m=await packV(f);t=await vthumb(f);ext=m===f?(f.name.split('.').pop()||'mp4'):m.type.includes('mp4')?'mp4':'webm'}
+async function one(f,gid){const v=f.type.startsWith('video'),id=uid();let m,t,lat,lng,at=f.lastModified;
+if(v){m=await packV(f);t=await vthumb(f)}
 else{const g=await exifr.gps(f).catch(()=>null);if(g){lat=g.latitude;lng=g.longitude}
 const e=await exifr.parse(f,['DateTimeOriginal']).catch(()=>null);if(e&&e.DateTimeOriginal)at=+e.DateTimeOriginal;
 m=await rs(f,1600,.8);t=await rs(f,400,.7)}
-const p=d+id+'.'+ext,tp=d+'t_'+id+'.jpg';
-await put(p,m,m.type||'video/mp4');await put(tp,t,'image/jpeg');
+const p=URL.createObjectURL(m),tp=URL.createObjectURL(t);
 return{id,p,t:tp,k:v?'v':'p',lat,lng,at}}
 async function upP(fs){const g=data.groups.find(x=>x.id===galG);if(!g)return alert('먼저 왼쪽 아래 ＋ 그룹으로 그룹을 만들어 주세요.');
 const st=$('#gst');let n=0;
@@ -166,14 +153,13 @@ window.addEventListener('popstate',()=>{const t=ovs.pop();if(t){document.getElem
 /* ===== 크게 보기 ===== */
 function viewP(id){gi=galList;gx=galList.findIndex(x=>x.id===id);openOv('gv',()=>{$('#gm').innerHTML=''});showG()}
 function showG(){const it=gi[gx],my=++gTok,box=$('#gm');box.innerHTML='';
-if(it.k==='v'){box.innerHTML='<video src="'+F(it.p)+'" controls autoplay playsinline></video>'}
-else{const im=document.createElement('img');im.src=F(it.t);box.appendChild(im);const hi=new Image();hi.onload=()=>{if(my===gTok)im.src=F(it.p)};hi.src=F(it.p)}
-$('#gc').textContent=(gx+1)+' / '+gi.length;
-[1,-1,2].forEach(d=>{const n=gi[(gx+d+gi.length)%gi.length];if(n&&n.k!=='v'){new Image().src=F(n.p)}})}
+if(it.k==='v'){box.innerHTML='<video src="'+it.p+'" controls autoplay playsinline></video>'}
+else{const im=document.createElement('img');im.src=it.p;box.appendChild(im)}
+$('#gc').textContent=(gx+1)+' / '+gi.length;}
 const mvG=d=>{gx=(gx+d+gi.length)%gi.length;showG()};
 function closeG(){closeOv('gv')}
 async function delG(){if(!confirm('이 사진을 삭제할까요?'))return;const it=gi[gx],g=data.groups.find(x=>x.id===galG);
-await del([it.p,it.t]);g.photos=g.photos.filter(x=>x.id!==it.id);save();closeG();render()}
+g.photos=g.photos.filter(x=>x.id!==it.id);save();closeG();render()}
 $('#gm').addEventListener('touchstart',e=>sx0=e.touches[0].clientX);
 $('#gm').addEventListener('touchend',e=>{const d=e.changedTouches[0].clientX-sx0;if(Math.abs(d)>50)mvG(d<0?1:-1)});
 
@@ -183,17 +169,16 @@ const km=a=>a.reduce((s,p,i)=>{if(!i)return 0;const q=a[i-1],r=Math.PI/180,x=Mat
 function openMap(){openOv('mapv');
 if(!map){map=L.map('map').setView([36.64,127.49],9);L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(map)}
 setTimeout(()=>map.invalidateSize(),80);mk.forEach(m=>m.remove());mk=[];
-data.groups.flatMap(g=>g.photos||[]).filter(i=>i.lat!=null).forEach(i=>mk.push(L.marker([i.lat,i.lng]).addTo(map).bindPopup('<img src="'+F(i.t)+'" width="120">')));
+data.groups.flatMap(g=>g.photos||[]).filter(i=>i.lat!=null).forEach(i=>mk.push(L.marker([i.lat,i.lng]).addTo(map).bindPopup('<img src="'+i.t+'" width="120">')));
 if(mk.length)map.fitBounds(L.featureGroup(mk).getBounds().pad(.2));loadTrk()}
-function loadTrk(){$('#trk').innerHTML=(data.tracks||[]).map(x=>`<div class="card"><span>${esc(x.name)}<br><small>${x.km.toFixed(1)}km</small></span><span class="row"><button onclick="showTrk('${x.id}')">보기</button><button onclick="dlTrk('${x.id}')">받기</button><button class="red" onclick="delTrk('${x.id}')">삭제</button></span></div>`).join('')}
+function loadTrk(){$('#trk').innerHTML=(data.tracks||[]).map(x=>`<div class="card"><span>${esc(x.name)}<br><small>${x.km.toFixed(1)}km</small></span><span class="row"><button onclick="showTrk('${x.id}')">보기</button><button class="red" onclick="delTrk('${x.id}')">삭제</button></span></div>`).join('')}
 async function addGpx(f){if(!f)return;const a=pts(await f.text());if(!a.length)return alert('경로 점을 찾지 못했습니다.');
-const id=uid(),p='gpx/'+id+'.gpx';await put(p,f,'application/gpx+xml');
-(data.tracks=data.tracks||[]).unshift({id,name:f.name.replace(/\.gpx$/i,''),path:p,km:km(a)});save();loadTrk()}
-async function showTrk(id){const x=data.tracks.find(t=>t.id===id);if(!x)return;const a=pts(await(await fetch(F(x.path))).text());
+const id=uid();
+(data.tracks=data.tracks||[]).unshift({id,name:f.name.replace(/\.gpx$/i,''),blob:URL.createObjectURL(f),km:km(a)});save();loadTrk()}
+async function showTrk(id){const x=data.tracks.find(t=>t.id===id);if(!x)return;const a=pts(await(await fetch(x.blob)).text());
 pl.forEach(l=>l.remove());pl=[L.polyline(a,{color:'#007aff',weight:4}).addTo(map)];map.fitBounds(pl[0].getBounds())}
-function dlTrk(id){const x=data.tracks.find(t=>t.id===id);if(x)location.href=F(x.path)+'&dl='+encodeURIComponent(x.name+'.gpx')}
 async function delTrk(id){const x=data.tracks.find(t=>t.id===id);if(!x||!confirm('경로를 삭제할까요?'))return;
-await del([x.path]);data.tracks=data.tracks.filter(t=>t.id!==id);save();loadTrk()}
+data.tracks=data.tracks.filter(t=>t.id!==id);save();loadTrk()}
 
 /* ===== 걸음 수 ===== */
 function openSteps(){openOv('stv');$('#sd').value=new Date().toISOString().slice(0,10);loadSteps()}
@@ -202,9 +187,9 @@ function loadSteps(){const e=Object.entries(data.steps||{}).sort((a,b)=>b[0].loc
 $('#sl').innerHTML=e.map(([d,n])=>`<div style="margin:8px 0"><small>${d} · ${n.toLocaleString()}걸음</small><div style="height:14px;border-radius:4px;background:var(--pri);width:${n/mx*100}%"></div></div>`).join('')||'<small>기록이 없습니다.</small>'}
 
 init();
- if ('serviceWorker' in navigator) {
+if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js');
-  }
+}
 </script>
 </body>
 </html>
