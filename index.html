@@ -202,6 +202,9 @@ function loadSteps(){const e=Object.entries(data.steps||{}).sort((a,b)=>b[0].loc
 $('#sl').innerHTML=e.map(([d,n])=>`<div style="margin:8px 0"><small>${d} · ${n.toLocaleString()}걸음</small><div style="height:14px;border-radius:4px;background:var(--pri);width:${n/mx*100}%"></div></div>`).join('')||'<small>기록이 없습니다.</small>'}
 
 init();
+ if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js');
+  }
 </script>
 </body>
 </html>
