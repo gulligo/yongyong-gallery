@@ -1,6 +1,7 @@
 {
+  "id": "/yongyong-gallery/",
   "name": "용용이 사진첩",
-  "short_name": "용용이사진",
+  "short_name": "사진첩",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#ffffff",
@@ -9,14 +10,12 @@
     {
       "src": "icon.png",
       "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "type": "image/png"
     },
     {
       "src": "icon.png",
       "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "type": "image/png"
     }
   ]
 }
