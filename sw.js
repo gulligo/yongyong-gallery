@@ -1,3 +1,11 @@
-self.addEventListener('fetch', function(event) {
-    // 서비스 워커 기본 설정
+self.addEventListener('install', (e) => {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (e) => {
+  return self.clients.claim();
+});
+
+self.addEventListener('fetch', (e) => {
+  e.respondWith(fetch(e.request));
 });
