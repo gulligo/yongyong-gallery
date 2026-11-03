@@ -13,21 +13,20 @@
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
 html,body{height:100%;overflow-x:hidden}
 body{font:15px/1.4 system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--tx);display:flex;flex-direction:column}
-.top{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#fff;border-bottom:1px solid var(--bd);font-weight:700;font-size:17px;flex:none}
+.top{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#fff;border-bottom:1px solid var(--bd);font-weight:700;font-size:17px;flex:none}
 button,.btn{border:0;border-radius:8px;padding:8px 11px;font-weight:600;font-size:13px;font-family:inherit;background:var(--bg);color:var(--tx);cursor:pointer}
 .pri{background:var(--pri);color:#fff}.red{background:var(--red);color:#fff}
 .ib{background:none;font-size:21px;padding:2px 6px}
 .wrap{flex:1;display:flex;min-height:0}
-.side{width:92px;flex:none;background:#fff;border-right:1px solid var(--bd);overflow-y:auto}
-.side div{padding:14px 8px;font-size:13px;font-weight:600;border-bottom:1px solid var(--bd);word-break:break-all}
-.side div.on{background:var(--pri);color:#fff}.side small{opacity:.7;font-weight:400}
+.side{width:66px;flex:none;background:#fff;border-right:1px solid var(--bd);overflow-y:auto}
+.side div{padding:9px 4px;font-size:12px;line-height:1.25;font-weight:600;border-bottom:1px solid var(--bd);word-break:break-all}
+.side div.on{background:var(--pri);color:#fff}.side small{opacity:.7;font-weight:400;font-size:10px}
 .main{flex:1;min-width:0;overflow-y:auto;overflow-x:hidden;touch-action:pan-y}
-.bar{position:sticky;top:0;z-index:2;background:#fff;border-bottom:1px solid var(--bd);padding:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.bar{position:sticky;top:0;z-index:2;background:#fff;border-bottom:1px solid var(--bd);padding:6px 8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .bar span{flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:700}
-.dh{padding:10px 8px 4px;font-size:12px;font-weight:700;color:var(--mu)}
+.dh{padding:6px 8px 2px;font-size:12px;font-weight:700;color:var(--mu)}
 .hint{padding:6px 8px;font-size:12px;color:var(--pri)}
-.pg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px}
-@media(min-width:700px){.pg{grid-template-columns:repeat(6,minmax(0,1fr))}}
+.pg{display:grid;grid-template-columns:repeat(var(--c,3),minmax(0,1fr));gap:1px}
 .pg div{position:relative;aspect-ratio:1;background:#d8dde2;user-select:none}
 .pg img{width:100%;height:100%;object-fit:cover;pointer-events:none}
 .pg b{position:absolute;right:4px;bottom:2px;color:#fff}
@@ -43,6 +42,7 @@ button,.btn{border:0;border-radius:8px;padding:8px 11px;font-weight:600;font-siz
 input{width:100%;font:inherit;padding:9px;border:1px solid var(--bd);border-radius:8px}
 .card{background:#fff;border-radius:10px;padding:10px 12px;margin:6px 0;display:flex;justify-content:space-between;align-items:center}
 .pg .mv{position:absolute;left:4px;top:4px;width:32px;height:32px;border-radius:50%;background:rgba(0,0,0,.5);color:#fff;font-size:17px;display:flex;align-items:center;justify-content:center;z-index:1}
+.gst{display:block;padding:3px 8px;min-height:20px;font-size:12px;color:var(--pri)}
 </style>
 </head>
 <body>
@@ -51,8 +51,8 @@ input{width:100%;font:inherit;padding:9px;border:1px solid var(--bd);border-radi
 <div class="wrap">
 <div class="side" id="gside"></div>
 <div class="main">
-<div class="bar"><span id="gtt"></span><button id="gmode" onclick="togM()"></button><button onclick="renGrp()">✎</button><label class="btn pri">＋<input type="file" accept="image/*,video/*" multiple hidden onchange="upP([...this.files]);this.value=''" /></label></div>
-<small id="gst" style="display:block;padding:4px 8px;color:var(--mu)"></small>
+<div class="bar"><span id="gtt"></span><small id="usg" onclick="showUsg()" style="color:var(--mu);white-space:nowrap;cursor:pointer"></small><button id="gmode" onclick="togM()"></button><button onclick="cycCols()">▦</button><button onclick="grpMenu()">⋯</button><label class="btn pri">＋<input type="file" accept="image/*,video/*" multiple hidden onchange="upP([...this.files]);this.value=''" /></label></div>
+<small id="gst" class="gst"></small>
 <div id="gbody"></div>
 </div>
 </div>
@@ -89,7 +89,7 @@ if(r.status===401){alert('비밀번호가 맞지 않습니다.');PW='';localStor
 return r}
 async function put(k,b,t){const r=await req('/f/'+k,{method:'PUT',headers:{'content-type':t},body:b});if(!r.ok)throw new Error('업로드 실패 '+r.status)}
 async function del(keys){if(!keys.length)return;const r=await req('/api/del',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(keys)});if(!r.ok)throw new Error('응답 '+r.status)}
-async function delSrv(keys){try{await del(keys)}catch(e){alert('서버에 연결할 수 없어 목록에서만 지웠습니다. 서버의 파일은 남아 있을 수 있습니다. ('+e.message+')')}}
+async function delSrv(keys){try{await del(keys);usage()}catch(e){alert('서버에 연결할 수 없어 목록에서만 지웠습니다. 서버의 파일은 남아 있을 수 있습니다. ('+e.message+')')}}
 function save(){data.ts=Date.now();localStorage.setItem('yy_data',JSON.stringify(data));clearTimeout(pushT);pushT=setTimeout(push,1200)}
 async function push(){try{await req('/api/data',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(data)})}catch(e){}}
 function srv(t){$('#srv').textContent=t}
@@ -102,7 +102,7 @@ if(!PW)ask();
 try{const r=await fetch(API+'/api/data',{headers:{'x-pw':PW}});
 if(r.status===401){srv('🔑 비밀번호 확인');$('#kb').style.display='';return}
 if(!r.ok){srv('⚠ 서버 오류 '+r.status);return}
-srv('☁ 연결됨');$('#kb').style.display='none';const d=await r.json();
+srv('☁ 연결됨');$('#kb').style.display='none';usage();const d=await r.json();
 if(d.groups&&(d.ts||0)>(data.ts||0)){data=d;localStorage.setItem('yy_data',JSON.stringify(data));render()}
 else if((data.ts||0)>(d.ts||0))push()}catch(e){srv('⚠ 서버 연결 안 됨 (주소 확인)')}}
 
@@ -133,9 +133,9 @@ errShown=false;
 const g=data.groups.find(x=>x.id===galG);
 if(!g){$('#gtt').textContent='';$('#gmode').textContent='';$('#gbody').innerHTML='<div class="hint">왼쪽 아래 ＋ 그룹을 눌러 시작하세요</div>';return}
 g.photos=g.photos||[];$('#gtt').textContent=g.name;$('#gmode').textContent=g.manual?'🖐 직접':'📅 날짜';
-const cell=i=>`<div data-pid="${i.id}" onclick="tapP('${i.id}')"${i.id===selP?' style="outline:4px solid var(--pri);outline-offset:-4px;opacity:.6"':''}><img src="${F(i.t)}" loading="lazy" onerror="imgErr(this)">${i.k==='v'?'<b>▶</b>':''}</div>`;
+const cell=i=>`<div data-pid="${i.id}" onclick="tapP('${i.id}')"${i.id===selP?' style="outline:4px solid var(--pri);outline-offset:-4px;opacity:.6"':''}><img src="${F(i.t)}" loading="lazy" decoding="async" onerror="imgErr(this)">${i.k==='v'?'<b>▶</b>':''}</div>`;
 const hint=selP?(g.manual?'선택됨 · 옮길 자리의 사진을 누르거나, 왼쪽에서 다른 그룹을 누르세요 (같은 사진을 다시 누르면 취소)':'선택됨 · 왼쪽에서 옮길 그룹을 누르세요 (사진을 누르면 취소)'):(g.manual?'사진을 1초 이상 누르면 옮길 수 있습니다':'');
-const hh=hint?`<div class="hint">${hint}</div>`:'';
+$('#gst').textContent=selG?'옮길 자리의 그룹을 누르세요 (같은 그룹을 다시 누르면 취소)':hint;applyCols();const hh='';
 if(g.manual){galList=[...g.photos];$('#gbody').innerHTML=hh+'<div class="pg">'+galList.map(cell).join('')+'</div>';return}
 galList=[...g.photos].sort((a,b)=>(b.at||0)-(a.at||0));const days={};
 galList.forEach(i=>{const d=new Date(i.at||0),k=d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0');(days[k]=days[k]||[]).push(i)});
@@ -173,7 +173,7 @@ async function upP(fs){const g=data.groups.find(x=>x.id===galG);if(!g)return ale
 const st=$('#gst');let n=0;
 for(const f of fs){st.textContent='올리는 중 '+(++n)+'/'+fs.length+' (영상은 시간이 걸립니다. 화면을 켜 두세요)';
 try{g.photos.push(await one(f,g.id));save()}catch(e){alert(f.name+' 실패: '+e.message)}}
-st.textContent='';render()}
+st.textContent='';render();usage()}
 
 /* ===== 뒤로가기 처리 ===== */
 const ovs=[];
@@ -231,6 +231,23 @@ function saveStep(){const n=+$('#sn').value;if(!$('#sd').value||isNaN(n))return;
 function loadSteps(){const e=Object.entries(data.steps||{}).sort((a,b)=>b[0].localeCompare(a[0])).slice(0,14),mx=Math.max(1,...e.map(x=>x[1]));
 $('#sl').innerHTML=e.map(([d,n])=>`<div style="margin:8px 0"><small>${d} · ${n.toLocaleString()}걸음</small><div style="height:14px;border-radius:4px;background:var(--pri);width:${n/mx*100}%"></div></div>`).join('')||'<small>기록이 없습니다.</small>'}
 
+let cols=+localStorage.getItem('yy_cols')||3;
+function applyCols(){$('#gbody').style.setProperty('--c',cols)}
+function setCols(n){cols=Math.max(2,Math.min(6,n));localStorage.setItem('yy_cols',cols);applyCols()}
+function cycCols(){setCols(cols>=5?2:cols+1)}
+(function(){const m=$('.main');let d0=0;const dist=e=>Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+m.addEventListener('touchstart',e=>{if(e.touches.length===2){d0=dist(e);clearTimeout(lpTimer)}},{passive:true});
+m.addEventListener('touchmove',e=>{if(e.touches.length===2&&d0){const r=dist(e)/d0;if(r>1.3){setCols(cols-1);d0=dist(e)}else if(r<.75){setCols(cols+1);d0=dist(e)}}},{passive:true});
+m.addEventListener('touchend',e=>{if(e.touches.length<2)d0=0})})();
+async function usage(){try{const r=await req('/api/usage');if(!r.ok)return;const u=await r.json();window.usg=u;$('#usg').textContent=(u.bytes/1e10*100).toFixed(1)+'%'}catch(e){}}
+function showUsg(){const u=window.usg;if(!u)return alert('용량 정보를 불러오지 못했습니다. Worker를 새 코드로 Deploy했는지 확인해 주세요.');
+alert('사용 '+(u.bytes/1e9).toFixed(2)+'GB / 10GB ('+(u.bytes/1e10*100).toFixed(1)+'%)\n남은 용량 약 '+(10-u.bytes/1e9).toFixed(2)+'GB\n파일 '+u.count.toLocaleString()+'개')}
+function grpMenu(){const g=data.groups.find(x=>x.id===galG);if(!g)return;
+const c=prompt('「'+g.name+'」\n1 = 이름 바꾸기\n2 = 그룹 삭제 (사진이 하나도 없을 때만)','1');
+if(c==='1')renGrp();
+else if(c==='2'){if((g.photos||[]).length)return alert('사진이 들어 있는 그룹은 삭제할 수 없습니다.\n먼저 사진을 지우거나 다른 그룹으로 옮겨 주세요.');
+if(confirm('빈 그룹 「'+g.name+'」을(를) 삭제할까요?')){data.groups=data.groups.filter(x=>x.id!==g.id);save();render()}}}
+
 function lpBind(root,sel,fn){
 root.addEventListener('touchstart',e=>{const t=e.target.closest(sel);if(!t||e.touches.length>1)return;lpX=e.touches[0].clientX;lpY=e.touches[0].clientY;clearTimeout(lpTimer);
 lpTimer=setTimeout(()=>{lpFired=Date.now();if(navigator.vibrate)navigator.vibrate(40);fn(t)},1000)},{passive:true});
@@ -240,6 +257,7 @@ root.addEventListener('contextmenu',e=>e.preventDefault())}
 lpBind($('#gbody'),'[data-pid]',el=>{selP=el.dataset.pid;selG=null;render()});
 lpBind($('#gside'),'[data-gid]',el=>{selG=el.dataset.gid;selP=null;render()});
 
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 init();
 </script>
 </body>
