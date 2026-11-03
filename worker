@@ -1,0 +1,68 @@
+export default {
+  async fetch(req, env) {
+    const cors = {
+      'access-control-allow-origin': '*',
+      'access-control-allow-headers': 'x-pw,content-type,range',
+      'access-control-allow-methods': 'GET,PUT,POST,DELETE,OPTIONS',
+      'access-control-expose-headers': 'content-range,accept-ranges',
+    };
+    if (req.method === 'OPTIONS') return new Response(null, { headers: cors });
+    const u = new URL(req.url);
+    const pw = req.headers.get('x-pw') || u.searchParams.get('t') || '';
+    const R = (b, s = 200, h = {}) => new Response(b, { status: s, headers: { ...cors, ...h } });
+    if (!env.PASSWORD || pw !== env.PASSWORD) return R('unauthorized', 401);
+    const B = env.BUCKET;
+
+    if (u.pathname === '/api/data') {
+      if (req.method === 'GET') {
+        const o = await B.get('data.json');
+        return R(o ? o.body : '{}', 200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+      }
+      if (req.method === 'PUT') {
+        await B.put('data.json', req.body, { httpMetadata: { contentType: 'application/json' } });
+        return R('ok');
+      }
+    }
+    if (u.pathname === '/api/del' && req.method === 'POST') {
+      const keys = await req.json();
+      if (Array.isArray(keys) && keys.length) await B.delete(keys.filter(k => k !== 'data.json').slice(0, 1000));
+      return R('ok');
+    }
+    if (u.pathname === '/api/usage' && req.method === 'GET') {
+      let cur, bytes = 0, count = 0;
+      do {
+        const l = await B.list({ cursor: cur, limit: 1000 });
+        for (const o of l.objects) { bytes += o.size; count++; }
+        cur = l.truncated ? l.cursor : undefined;
+      } while (cur);
+      return R(JSON.stringify({ bytes, count }), 200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+    }
+    if (u.pathname.startsWith('/f/')) {
+      const key = decodeURIComponent(u.pathname.slice(3));
+      if (!key || key === 'data.json') return R('bad request', 400);
+      if (req.method === 'PUT') {
+        await B.put(key, req.body, { httpMetadata: { contentType: req.headers.get('content-type') || 'application/octet-stream' } });
+        return R('ok');
+      }
+      if (req.method === 'GET') {
+        const o = await B.get(key, { range: req.headers });
+        if (!o) return R('not found', 404);
+        const h = new Headers(cors);
+        o.writeHttpMetadata(h);
+        h.set('etag', o.httpEtag);
+        h.set('accept-ranges', 'bytes');
+        h.set('cache-control', 'private, max-age=31536000, immutable');
+        const dl = u.searchParams.get('dl');
+        if (dl) h.set('content-disposition', "attachment; filename*=UTF-8''" + encodeURIComponent(dl));
+        let st = 200;
+        if (o.range && o.range.offset !== undefined) {
+          const s = o.range.offset, l = o.range.length ?? (o.size - s);
+          h.set('content-range', `bytes ${s}-${s + l - 1}/${o.size}`);
+          st = 206;
+        }
+        return new Response(o.body, { status: st, headers: h });
+      }
+    }
+    return R('not found', 404);
+  },
+};
