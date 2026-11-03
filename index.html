@@ -35,9 +35,9 @@ button,.btn{border:0;border-radius:8px;padding:8px 11px;font-weight:600;font-siz
 .ov.show{display:flex}
 #gv{background:#0b1015;color:#fff;padding:0}
 #gv .m{flex:1;display:flex;align-items:center;justify-content:center;min-height:0}
-#gv .m img,#gv .m video{max-width:100%;max-height:100%}
+#gv .m{position:absolute;inset:0}#gv .m img,#gv .m video{width:100%;height:100%;object-fit:contain;display:block}
 #gv .r{display:flex;gap:8px;padding:10px;align-items:center}
-#gv button{background:#2a323b;color:#fff;flex:none}
+#gdel{background:var(--red);color:#fff;position:absolute;left:50%;bottom:30px;transform:translateX(-50%);padding:12px 30px;font-size:15px;border-radius:24px;z-index:2}
 #map{height:55vh;border-radius:10px;margin:8px 0}
 .row{display:flex;gap:8px;margin:6px 0;align-items:center}
 input{width:100%;font:inherit;padding:9px;border:1px solid var(--bd);border-radius:8px}
@@ -46,7 +46,7 @@ input{width:100%;font:inherit;padding:9px;border:1px solid var(--bd);border-radi
 </style>
 </head>
 <body>
-<div class="top"><span>용용이 사진첩 <small id="srv" style="font-size:12px;font-weight:400"></small></span><span><button class="ib" onclick="setPw()">🔑</button><button class="ib" onclick="openMap()">🗺</button><button class="ib" onclick="openSteps()">👣</button></span></div>
+<div class="top"><span>용용이 사진첩 <small id="srv" style="font-size:12px;font-weight:400"></small></span><span><button class="ib" id="kb" onclick="setPw()" style="display:none">🔑</button><button class="ib" onclick="openMap()">🗺</button><button class="ib" onclick="openSteps()">👣</button></span></div>
 
 <div class="wrap">
 <div class="side" id="gside"></div>
@@ -67,9 +67,8 @@ input{width:100%;font:inherit;padding:9px;border:1px solid var(--bd);border-radi
 <div id="sl"></div>
 </div>
 <div class="ov" id="gv">
-<div class="r"><button onclick="closeG()">닫기</button><span id="gc"></span><span style="flex:1"></span><button style="background:var(--red)" onclick="delG()">삭제</button></div>
 <div class="m" id="gm"></div>
-<div class="r"><button style="flex:1" onclick="mvG(-1)">‹</button><button style="flex:1" onclick="mvG(1)">›</button></div>
+<button id="gdel" onclick="delG()" style="display:none">삭제</button>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -101,25 +100,25 @@ render();
 if(API.includes('여기에')){srv('⚠ API 주소 미설정');alert('index.html 맨 위의 API 주소를 Cloudflare Worker 주소로 바꿔야 합니다.');return}
 if(!PW)ask();
 try{const r=await fetch(API+'/api/data',{headers:{'x-pw':PW}});
-if(r.status===401){srv('🔑 비밀번호 확인');return}
+if(r.status===401){srv('🔑 비밀번호 확인');$('#kb').style.display='';return}
 if(!r.ok){srv('⚠ 서버 오류 '+r.status);return}
-srv('☁ 연결됨');const d=await r.json();
+srv('☁ 연결됨');$('#kb').style.display='none';const d=await r.json();
 if(d.groups&&(d.ts||0)>(data.ts||0)){data=d;localStorage.setItem('yy_data',JSON.stringify(data));render()}
 else if((data.ts||0)>(d.ts||0))push()}catch(e){srv('⚠ 서버 연결 안 됨 (주소 확인)')}}
 
 /* ===== 대그룹 / 사진 목록 ===== */
-let grpMode=false,selG=null;
+let selG=null,lpFired=0,lpTimer=null,lpX=0,lpY=0;
 function render(){
 if(!data.groups.find(g=>g.id===galG))galG=data.groups[0]?data.groups[0].id:null;
-$('#gside').innerHTML=data.groups.map(g=>`<div class="${g.id===galG&&!grpMode?'on':''}"${grpMode&&g.id===selG?' style="outline:3px solid var(--pri);outline-offset:-3px;opacity:.6"':''} onclick="pickG('${g.id}')">${esc(g.name)}<br><small>${(g.photos||[]).length}장</small></div>`).join('')+'<div onclick="addGrp()" style="color:var(--pri)">＋ 그룹</div><div onclick="togGrp()" style="color:var(--pri)">'+(grpMode?'✔ 순서 끝':'↕ 순서')+'</div>';
+$('#gside').innerHTML=data.groups.map(g=>`<div data-gid="${g.id}" class="${g.id===galG?'on':''}"${g.id===selG?' style="outline:3px solid var(--pri);outline-offset:-3px;opacity:.6"':''} onclick="tapG('${g.id}')">${esc(g.name)}<br><small>${(g.photos||[]).length}장</small></div>`).join('')+'<div onclick="addGrp()" style="color:var(--pri)">＋ 그룹</div>';
+$('#gst').textContent=selG?'옮길 자리의 그룹을 누르세요 (같은 그룹을 다시 누르면 취소)':'';
 renderBody()}
-function togGrp(){grpMode=!grpMode;selG=null;$('#gst').textContent=grpMode?'순서 바꾸기: 옮길 그룹을 누르고, 옮길 자리의 그룹을 누르세요':'';render()}
-function pickG(id){
-if(grpMode){
-if(!selG){selG=id}else if(selG===id){selG=null}
-else{const a=data.groups.findIndex(x=>x.id===selG),b=data.groups.findIndex(x=>x.id===id);if(a>=0&&b>=0){const it=data.groups.splice(a,1)[0];data.groups.splice(b,0,it);save()}selG=null}
-render();return}
-galG=id;selP=null;render()}
+function tapG(id){if(Date.now()-lpFired<800)return;
+if(selG){if(selG!==id){const a=data.groups.findIndex(x=>x.id===selG),b=data.groups.findIndex(x=>x.id===id);if(a>=0&&b>=0){const it=data.groups.splice(a,1)[0];data.groups.splice(b,0,it);save()}}selG=null;render();return}
+if(selP){const from=data.groups.find(x=>x.id===galG),to=data.groups.find(x=>x.id===id);let msg='';
+if(from&&to&&from!==to){const i=from.photos.findIndex(x=>x.id===selP);if(i>=0){to.photos=to.photos||[];to.photos.push(from.photos.splice(i,1)[0]);save();msg='「'+to.name+'」로 옮겼습니다'}}
+selP=null;render();if(msg)$('#gst').textContent=msg;return}
+galG=id;render()}
 function addGrp(){const n=prompt('그룹 이름');if(!n||!n.trim())return;const g={id:uid(),name:n.trim(),photos:[]};data.groups.push(g);galG=g.id;save();render()}
 function renGrp(){const g=data.groups.find(x=>x.id===galG);if(!g)return;const n=prompt('새 이름',g.name);if(n&&n.trim()){g.name=n.trim();save();render()}}
 async function delGrp(){const g=data.groups.find(x=>x.id===galG);if(!g)return;
@@ -134,16 +133,18 @@ errShown=false;
 const g=data.groups.find(x=>x.id===galG);
 if(!g){$('#gtt').textContent='';$('#gmode').textContent='';$('#gbody').innerHTML='<div class="hint">왼쪽 아래 ＋ 그룹을 눌러 시작하세요</div>';return}
 g.photos=g.photos||[];$('#gtt').textContent=g.name;$('#gmode').textContent=g.manual?'🖐 직접':'📅 날짜';
-const cell=(i,fn,st)=>`<div onclick="${fn}('${i.id}')"${st||''}><img src="${F(i.t)}" loading="lazy" onerror="imgErr(this)">${i.k==='v'?'<b>▶</b>':''}</div>`;
-if(g.manual){galList=[...g.photos];
-$('#gbody').innerHTML=`<div class="hint">${selP?'옮길 자리 사진의 ✥를 누르세요 (같은 ✥를 다시 누르면 취소)':'사진을 누르면 크게 보기 · 옮기려면 사진 왼쪽 위 ✥를 먼저 누르세요'}</div><div class="pg">`+galList.map(i=>`<div onclick="viewP('${i.id}')"${i.id===selP?' style="outline:4px solid var(--pri);outline-offset:-4px;opacity:.6"':''}><img src="${F(i.t)}" loading="lazy" onerror="imgErr(this)">${i.k==='v'?'<b>▶</b>':''}<span class="mv" onclick="event.stopPropagation();pickP('${i.id}')">✥</span></div>`).join('')+'</div>';return}
+const cell=i=>`<div data-pid="${i.id}" onclick="tapP('${i.id}')"${i.id===selP?' style="outline:4px solid var(--pri);outline-offset:-4px;opacity:.6"':''}><img src="${F(i.t)}" loading="lazy" onerror="imgErr(this)">${i.k==='v'?'<b>▶</b>':''}</div>`;
+const hint=selP?(g.manual?'선택됨 · 옮길 자리의 사진을 누르거나, 왼쪽에서 다른 그룹을 누르세요 (같은 사진을 다시 누르면 취소)':'선택됨 · 왼쪽에서 옮길 그룹을 누르세요 (사진을 누르면 취소)'):(g.manual?'사진을 1초 이상 누르면 옮길 수 있습니다':'');
+const hh=hint?`<div class="hint">${hint}</div>`:'';
+if(g.manual){galList=[...g.photos];$('#gbody').innerHTML=hh+'<div class="pg">'+galList.map(cell).join('')+'</div>';return}
 galList=[...g.photos].sort((a,b)=>(b.at||0)-(a.at||0));const days={};
 galList.forEach(i=>{const d=new Date(i.at||0),k=d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0');(days[k]=days[k]||[]).push(i)});
-$('#gbody').innerHTML=Object.keys(days).map(k=>`<div class="dh">${k}</div><div class="pg">${days[k].map(i=>cell(i,'viewP')).join('')}</div>`).join('')||'<div class="hint">사진이 없습니다. 오른쪽 위 ＋를 눌러 올리세요.</div>'}
-function pickP(id){const g=data.groups.find(x=>x.id===galG);if(!g)return;
-if(!selP){selP=id}else if(selP===id){selP=null}
-else{const a=g.photos.findIndex(x=>x.id===selP),b=g.photos.findIndex(x=>x.id===id);if(a>=0&&b>=0){const it=g.photos.splice(a,1)[0];g.photos.splice(b,0,it);save()}selP=null}
-renderBody()}
+$('#gbody').innerHTML=hh+(Object.keys(days).map(k=>`<div class="dh">${k}</div><div class="pg">${days[k].map(cell).join('')}</div>`).join('')||'<div class="hint">사진이 없습니다. 오른쪽 위 ＋를 눌러 올리세요.</div>')}
+function tapP(id){if(Date.now()-lpFired<800)return;
+if(selP){const g=data.groups.find(x=>x.id===galG);
+if(selP!==id&&g&&g.manual){const a=g.photos.findIndex(x=>x.id===selP),b=g.photos.findIndex(x=>x.id===id);if(a>=0&&b>=0){const it=g.photos.splice(a,1)[0];g.photos.splice(b,0,it);save()}}
+selP=null;render();return}
+viewP(id)}
 
 /* ===== 올리기 (사진 압축 / 영상 압축) ===== */
 async function rs(src,w,q){const b=src instanceof Blob?await createImageBitmap(src,{imageOrientation:'from-image'}):src;
@@ -156,7 +157,7 @@ async function packV(f){try{const v=document.createElement('video');v.playsInlin
 const s=Math.min(1,1280/Math.max(v.videoWidth,v.videoHeight)),c=document.createElement('canvas');c.width=v.videoWidth*s&~1;c.height=v.videoHeight*s&~1;
 const x=c.getContext('2d'),out=c.captureStream(30);await v.play();(v.captureStream?v.captureStream():new MediaStream()).getAudioTracks().forEach(t=>out.addTrack(t));
 const mt=['video/mp4','video/webm;codecs=vp9,opus','video/webm'].find(t=>MediaRecorder.isTypeSupported(t));
-const rec=new MediaRecorder(out,{mimeType:mt,videoBitsPerSecond:2e6}),ch=[];rec.ondataavailable=e=>ch.push(e.data);
+const rec=new MediaRecorder(out,{mimeType:mt,videoBitsPerSecond:3e6}),ch=[];rec.ondataavailable=e=>ch.push(e.data);
 const done=new Promise(r=>rec.onstop=r);rec.start(1000);
 (function d(){if(v.ended)return;x.drawImage(v,0,0,c.width,c.height);requestAnimationFrame(d)})();
 await once(v,'ended');rec.stop();await done;const o=new Blob(ch,{type:mt.split(';')[0]});return o.size&&o.size<f.size?o:f}catch(e){return f}}
@@ -164,7 +165,7 @@ async function one(f,gid){const v=f.type.startsWith('video'),id=uid(),d='g/'+gid
 if(v){m=await packV(f);t=await vthumb(f);ext=m===f?(f.name.split('.').pop()||'mp4'):m.type.includes('mp4')?'mp4':'webm'}
 else{const g=await exifr.gps(f).catch(()=>null);if(g){lat=g.latitude;lng=g.longitude}
 const e=await exifr.parse(f,['DateTimeOriginal']).catch(()=>null);if(e&&e.DateTimeOriginal)at=+e.DateTimeOriginal;
-m=await rs(f,1600,.8);t=await rs(f,400,.7)}
+const bm=await createImageBitmap(f,{imageOrientation:'from-image'});m=await rs(bm,1920,.8);t=await rs(bm,480,.75);if(bm.close)bm.close()}
 const p=d+id+'.'+ext,tp=d+'t_'+id+'.jpg';
 await put(p,m,m.type||'video/mp4');await put(tp,t,'image/jpeg');
 return{id,p,t:tp,k:v?'v':'p',lat,lng,at}}
@@ -183,17 +184,28 @@ window.addEventListener('popstate',()=>{const t=ovs.pop();if(t){document.getElem
 
 /* ===== 크게 보기 ===== */
 function viewP(id){gi=galList;gx=galList.findIndex(x=>x.id===id);openOv('gv',()=>{$('#gm').innerHTML=''});showG()}
-function showG(){const it=gi[gx],my=++gTok,box=$('#gm');box.innerHTML='';
+const pre=new Set();
+function showG(){const it=gi[gx],my=++gTok,box=$('#gm');box.innerHTML='';$('#gdel').style.display='none';
 if(it.k==='v'){box.innerHTML='<video src="'+F(it.p)+'" controls autoplay playsinline></video>'}
-else{const im=document.createElement('img');im.src=F(it.t);box.appendChild(im);const hi=new Image();hi.onload=()=>{if(my===gTok)im.src=F(it.p)};hi.src=F(it.p)}
-$('#gc').textContent=(gx+1)+' / '+gi.length;
-[1,-1,2].forEach(d=>{const n=gi[(gx+d+gi.length)%gi.length];if(n&&n.k!=='v'){new Image().src=F(n.p)}})}
-const mvG=d=>{gx=(gx+d+gi.length)%gi.length;showG()};
+else{const im=document.createElement('img');box.appendChild(im);
+if(pre.has(it.p)){im.src=F(it.p)}
+else{im.src=F(it.t);const hi=new Image();hi.onload=()=>{pre.add(it.p);const go=()=>{if(my===gTok)im.src=F(it.p)};hi.decode?hi.decode().then(go).catch(go):go()};hi.src=F(it.p)}}
+[1,-1,2,-2].forEach(d=>{const n=gi[gx+d];if(n&&n.k!=='v'&&!pre.has(n.p)){const x=new Image();x.onload=()=>pre.add(n.p);x.src=F(n.p)}})}
+function mvG(d){const n=gx+d;if(n<0||n>=gi.length)return false;gx=n;showG();return true}
 function closeG(){closeOv('gv')}
 async function delG(){if(!confirm('이 사진을 삭제할까요?'))return;const it=gi[gx],g=data.groups.find(x=>x.id===galG);
 g.photos=g.photos.filter(x=>x.id!==it.id);save();closeG();render();delSrv([it.p,it.t])}
-$('#gm').addEventListener('touchstart',e=>sx0=e.touches[0].clientX);
-$('#gm').addEventListener('touchend',e=>{const d=e.changedTouches[0].clientX-sx0;if(Math.abs(d)>50)mvG(d<0?1:-1)});
+(function(){const box=$('#gm');let x0=0,y0=0,dx=0,dy=0,on=false,skip=false;
+box.addEventListener('touchstart',e=>{if(e.touches.length>1){on=false;return}const t=e.touches[0];x0=t.clientX;y0=t.clientY;dx=dy=0;on=true;
+skip=gi[gx]&&gi[gx].k==='v'&&y0>box.clientHeight*.7},{passive:true});
+box.addEventListener('touchmove',e=>{if(!on||skip)return;const t=e.touches[0];dx=t.clientX-x0;dy=t.clientY-y0;const el=box.firstChild;
+if(el&&Math.abs(dx)>10&&Math.abs(dx)>Math.abs(dy)){el.style.transition='none';el.style.transform='translateX('+dx+'px)'}},{passive:true});
+box.addEventListener('touchend',()=>{if(!on||skip){on=false;return}on=false;const el=box.firstChild;
+if(Math.abs(dx)>60&&Math.abs(dx)>Math.abs(dy)){if(!mvG(dx<0?1:-1)&&el){el.style.transition='transform .15s';el.style.transform=''}return}
+if(dy>110&&Math.abs(dx)<50){closeG();return}
+if(el){el.style.transition='transform .15s';el.style.transform=''}
+if(Math.abs(dx)<10&&Math.abs(dy)<10){const it=gi[gx];if(it&&(it.k!=='v'||y0<box.clientHeight*.25)){const b=$('#gdel');b.style.display=b.style.display==='none'?'block':'none'}}});
+box.addEventListener('touchcancel',()=>{on=false;const el=box.firstChild;if(el)el.style.transform=''})})();
 
 /* ===== 지도 + GPX ===== */
 const pts=t=>[...new DOMParser().parseFromString(t,'text/xml').querySelectorAll('trkpt')].map(p=>[+p.getAttribute('lat'),+p.getAttribute('lon')]);
@@ -218,6 +230,15 @@ function openSteps(){openOv('stv');$('#sd').value=new Date().toISOString().slice
 function saveStep(){const n=+$('#sn').value;if(!$('#sd').value||isNaN(n))return;(data.steps=data.steps||{})[$('#sd').value]=n;save();$('#sn').value='';loadSteps()}
 function loadSteps(){const e=Object.entries(data.steps||{}).sort((a,b)=>b[0].localeCompare(a[0])).slice(0,14),mx=Math.max(1,...e.map(x=>x[1]));
 $('#sl').innerHTML=e.map(([d,n])=>`<div style="margin:8px 0"><small>${d} · ${n.toLocaleString()}걸음</small><div style="height:14px;border-radius:4px;background:var(--pri);width:${n/mx*100}%"></div></div>`).join('')||'<small>기록이 없습니다.</small>'}
+
+function lpBind(root,sel,fn){
+root.addEventListener('touchstart',e=>{const t=e.target.closest(sel);if(!t||e.touches.length>1)return;lpX=e.touches[0].clientX;lpY=e.touches[0].clientY;clearTimeout(lpTimer);
+lpTimer=setTimeout(()=>{lpFired=Date.now();if(navigator.vibrate)navigator.vibrate(40);fn(t)},1000)},{passive:true});
+root.addEventListener('touchmove',e=>{const q=e.touches[0];if(Math.hypot(q.clientX-lpX,q.clientY-lpY)>12)clearTimeout(lpTimer)},{passive:true});
+['touchend','touchcancel'].forEach(ev=>root.addEventListener(ev,()=>clearTimeout(lpTimer)));
+root.addEventListener('contextmenu',e=>e.preventDefault())}
+lpBind($('#gbody'),'[data-pid]',el=>{selP=el.dataset.pid;selG=null;render()});
+lpBind($('#gside'),'[data-gid]',el=>{selG=el.dataset.gid;selP=null;render()});
 
 init();
 </script>
