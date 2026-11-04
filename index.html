@@ -19,7 +19,7 @@ button,.btn{border:0;border-radius:8px;padding:8px 11px;font-weight:600;font-siz
 .ib{background:none;font-size:21px;padding:2px 6px}
 .wrap{flex:1;display:flex;min-height:0}
 .side{width:66px;flex:none;background:#fff;border-right:1px solid var(--bd);overflow-y:auto}
-.side div{padding:9px 4px;font-size:12px;line-height:1.25;font-weight:600;border-bottom:1px solid var(--bd);word-break:break-all}
+.side div{text-align:center;padding:9px 4px;font-size:12px;line-height:1.25;font-weight:600;border-bottom:1px solid var(--bd);word-break:break-all}
 .side div.on{background:var(--pri);color:#fff}.side small{opacity:.7;font-weight:400;font-size:10px}
 .main{flex:1;min-width:0;overflow-y:auto;overflow-x:hidden;touch-action:pan-y}
 .bar{position:sticky;top:0;z-index:2;background:#fff;border-bottom:1px solid var(--bd);padding:6px 8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
@@ -43,6 +43,8 @@ input{width:100%;font:inherit;padding:9px;border:1px solid var(--bd);border-radi
 .card{background:#fff;border-radius:10px;padding:10px 12px;margin:6px 0;display:flex;justify-content:space-between;align-items:center}
 .pg .mv{position:absolute;left:4px;top:4px;width:32px;height:32px;border-radius:50%;background:rgba(0,0,0,.5);color:#fff;font-size:17px;display:flex;align-items:center;justify-content:center;z-index:1}
 .gst{display:block;padding:3px 8px;min-height:20px;font-size:12px;color:var(--pri)}
+#gdate{position:absolute;top:14px;left:16px;color:#fff;font-size:14px;text-shadow:0 1px 3px #000;z-index:2;pointer-events:none}
+#spd{position:absolute;top:22px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.55);color:#fff;padding:6px 14px;border-radius:16px;font-size:14px;display:none;z-index:2;pointer-events:none}
 </style>
 </head>
 <body>
@@ -68,6 +70,7 @@ input{width:100%;font:inherit;padding:9px;border:1px solid var(--bd);border-radi
 </div>
 <div class="ov" id="gv">
 <div class="m" id="gm"></div>
+<div id="gdate"></div><div id="spd">2배속 ▶▶</div>
 <button id="gdel" onclick="delG()" style="display:none">삭제</button>
 </div>
 
@@ -183,9 +186,14 @@ const i=ovs.findIndex(o=>o.id===id);if(i>=0){const o=ovs.splice(i,1)[0];document
 window.addEventListener('popstate',()=>{const t=ovs.pop();if(t){document.getElementById(t.id).classList.remove('show');if(t.onClose)t.onClose()}});
 
 /* ===== 크게 보기 ===== */
-function viewP(id){gi=galList;gx=galList.findIndex(x=>x.id===id);openOv('gv',()=>{$('#gm').innerHTML=''});showG()}
+function viewP(id){gi=galList;gx=galList.findIndex(x=>x.id===id);
+openOv('gv',()=>{$('#gm').innerHTML='';if(document.fullscreenElement&&document.exitFullscreen)document.exitFullscreen().catch(()=>{})});
+const e=$('#gv'),f=e.requestFullscreen||e.webkitRequestFullscreen;if(f){const p=f.call(e);if(p&&p.catch)p.catch(()=>{})}
+showG()}
+let delArm=false;
+function fmtAt(t){if(!t)return '';const d=new Date(t),w='일월화수목금토'[d.getDay()],z=n=>String(n).padStart(2,'0');return d.getFullYear()+'.'+z(d.getMonth()+1)+'.'+z(d.getDate())+' ('+w+') '+z(d.getHours())+':'+z(d.getMinutes())}
 const pre=new Set();
-function showG(){const it=gi[gx],my=++gTok,box=$('#gm');box.innerHTML='';$('#gdel').style.display='none';
+function showG(){const it=gi[gx],my=++gTok,box=$('#gm');box.innerHTML='';$('#gdel').style.display='none';$('#gdel').textContent='삭제';delArm=false;$('#gdate').textContent=fmtAt(it.at);
 if(it.k==='v'){box.innerHTML='<video src="'+F(it.p)+'" controls autoplay playsinline></video>'}
 else{const im=document.createElement('img');box.appendChild(im);
 if(pre.has(it.p)){im.src=F(it.p)}
@@ -193,19 +201,31 @@ else{im.src=F(it.t);const hi=new Image();hi.onload=()=>{pre.add(it.p);const go=(
 [1,-1,2,-2].forEach(d=>{const n=gi[gx+d];if(n&&n.k!=='v'&&!pre.has(n.p)){const x=new Image();x.onload=()=>pre.add(n.p);x.src=F(n.p)}})}
 function mvG(d){const n=gx+d;if(n<0||n>=gi.length)return false;gx=n;showG();return true}
 function closeG(){closeOv('gv')}
-async function delG(){if(!confirm('이 사진을 삭제할까요?'))return;const it=gi[gx],g=data.groups.find(x=>x.id===galG);
-g.photos=g.photos.filter(x=>x.id!==it.id);save();closeG();render();delSrv([it.p,it.t])}
-(function(){const box=$('#gm');let x0=0,y0=0,dx=0,dy=0,on=false,skip=false;
-box.addEventListener('touchstart',e=>{if(e.touches.length>1){on=false;return}const t=e.touches[0];x0=t.clientX;y0=t.clientY;dx=dy=0;on=true;
-skip=gi[gx]&&gi[gx].k==='v'&&y0>box.clientHeight*.7},{passive:true});
-box.addEventListener('touchmove',e=>{if(!on||skip)return;const t=e.touches[0];dx=t.clientX-x0;dy=t.clientY-y0;const el=box.firstChild;
-if(el&&Math.abs(dx)>10&&Math.abs(dx)>Math.abs(dy)){el.style.transition='none';el.style.transform='translateX('+dx+'px)'}},{passive:true});
-box.addEventListener('touchend',()=>{if(!on||skip){on=false;return}on=false;const el=box.firstChild;
+async function delG(){const b=$('#gdel');
+if(!delArm){delArm=true;b.textContent='한 번 더 누르면 삭제됩니다';setTimeout(()=>{delArm=false;if(b.textContent!=='삭제')b.textContent='삭제'},3000);return}
+delArm=false;const it=gi[gx],g=data.groups.find(x=>x.id===galG);
+g.photos=g.photos.filter(x=>x.id!==it.id);save();gi.splice(gx,1);render();delSrv([it.p,it.t]);
+if(!gi.length){closeG();return}
+if(gx>=gi.length)gx=gi.length-1;showG()}
+(function(){const box=$('#gm');let x0=0,y0=0,dx=0,dy=0,on=false,skip=false,fast=false,spT=null;
+const vid=()=>box.querySelector('video');
+const endFast=()=>{clearTimeout(spT);if(fast){fast=false;const v=vid();if(v)v.playbackRate=1;$('#spd').style.display='none'}};
+box.addEventListener('contextmenu',e=>e.preventDefault());
+box.addEventListener('touchstart',e=>{if(e.touches.length>1){on=false;endFast();return}const t=e.touches[0];x0=t.clientX;y0=t.clientY;dx=dy=0;on=true;fast=false;
+const isV=gi[gx]&&gi[gx].k==='v';skip=isV&&y0>box.clientHeight*.7;
+if(isV&&!skip){clearTimeout(spT);spT=setTimeout(()=>{const v=vid();if(v&&on){v.playbackRate=2;fast=true;$('#spd').style.display='block';if(navigator.vibrate)navigator.vibrate(20)}},500)}},{passive:true});
+box.addEventListener('touchmove',e=>{if(!on||skip)return;const t=e.touches[0];dx=t.clientX-x0;dy=t.clientY-y0;
+if(Math.abs(dx)>10||Math.abs(dy)>10)clearTimeout(spT);
+if(fast)return;
+const el=box.firstChild;if(el&&Math.abs(dx)>10&&Math.abs(dx)>Math.abs(dy)){el.style.transition='none';el.style.transform='translateX('+dx+'px)'}},{passive:true});
+box.addEventListener('touchend',()=>{const wasFast=fast;endFast();if(!on||skip){on=false;return}on=false;if(wasFast)return;
+const el=box.firstChild;
 if(Math.abs(dx)>60&&Math.abs(dx)>Math.abs(dy)){if(!mvG(dx<0?1:-1)&&el){el.style.transition='transform .15s';el.style.transform=''}return}
 if(dy>110&&Math.abs(dx)<50){closeG();return}
 if(el){el.style.transition='transform .15s';el.style.transform=''}
 if(Math.abs(dx)<10&&Math.abs(dy)<10){const it=gi[gx];if(it&&(it.k!=='v'||y0<box.clientHeight*.25)){const b=$('#gdel');b.style.display=b.style.display==='none'?'block':'none'}}});
-box.addEventListener('touchcancel',()=>{on=false;const el=box.firstChild;if(el)el.style.transform=''})})();
+box.addEventListener('touchcancel',()=>{endFast();on=false;const el=box.firstChild;if(el)el.style.transform=''})})();
+document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement&&ovs.some(o=>o.id==='gv'))closeOv('gv')});
 
 /* ===== 지도 + GPX ===== */
 const pts=t=>[...new DOMParser().parseFromString(t,'text/xml').querySelectorAll('trkpt')].map(p=>[+p.getAttribute('lat'),+p.getAttribute('lon')]);
