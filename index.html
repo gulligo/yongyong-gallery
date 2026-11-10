@@ -142,7 +142,7 @@ else if((data.ts||0)>(d.ts||0))push()}catch(e){srv('⚠ 서버 연결 안 됨 (�
 /* ===== 대그룹 / 사진 목록 ===== */
 let selG=null,lpFired=0,lpTimer=null,lpX=0,lpY=0;
 function render(){
-if(!data.groups.find(g=>g.id===galG))galG=data.groups[0]?data.groups[0].id:null;
+if(!data.groups.find(g=>g.id===galG)){const s=localStorage.getItem('yy_last');galG=data.groups.find(g=>g.id===s)?s:(data.groups[0]?data.groups[0].id:null)}else localStorage.setItem('yy_last',galG);
 const cg0=data.groups.find(x=>x.id===galG);$('#gside').innerHTML=data.groups.map(g=>`<div data-gid="${g.id}" class="${g.id===galG?'on':''}${g.id===selG?' sel':''}" onclick="tapG('${g.id}')">${esc(g.name)}<br><small>${(g.photos||[]).length}장</small></div>`).join('')+'<div onclick="addGrp()" style="color:var(--pri)">＋ 그룹</div><div onclick="togMemo()" style="color:var(--pri)">📝 메모'+(cg0&&cg0.memos&&cg0.memos.length?' ('+cg0.memos.length+')':'')+'</div>';
 $('#gst').textContent=selG?'옮길 자리의 그룹을 누르세요 (같은 그룹을 다시 누르면 취소)':'';
 renderBody();renderMemo()}
